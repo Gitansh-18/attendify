@@ -1,39 +1,25 @@
-import React, { createContext, useContext, useState } from 'react';
-import api from '../api/axios';
+import axios from 'axios';
 
-const AuthContext = createContext(null);
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL,
+});
 
-export const AuthProvider = ({ children }) => {
-  const [teacher, setTeacher] = useState(() => {
-    const stored = localStorage.getItem('teacher');
-    return stored ? JSON.parse(stored) : null;
-  });
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
 
-  const login = async (email, password) => {
-    const { data } = await api.post('/auth/login', { email, password });
-    localStorage.setItem('token', data.token);
-    localStorage.setItem('teacher', JSON.stringify(data.teacher));
-    setTeacher(data.teacher);
-  };
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('teacher');
+      window.location.href = '/login';
+    }
+    return Promise.reject(err);
+  }
+);
 
-  const signup = async (name, email, password) => {
-    const { data } = await api.post('/auth/signup', { name, email, password });
-    localStorage.setItem('token', data.token);
-    localStorage.setItem('teacher', JSON.stringify(data.teacher));
-    setTeacher(data.teacher);
-  };
-
-  const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('teacher');
-    setTeacher(null);
-  };
-
-  return (
-    <AuthContext.Provider value={{ teacher, login, signup, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
-};
-
-export const useAuth = () => useContext(AuthContext);
+export default api;
