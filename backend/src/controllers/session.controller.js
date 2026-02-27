@@ -99,7 +99,7 @@ const getSessionQR = async (req, res) => {
 //  This must exist in Render env
     const frontendURL = process.env.FRONTEND_URL;
 
-    const fullURL = `${frontendURL}/attend?payload=${encodeURIComponent(encrypted)}`;
+    const fullURL = `${frontendURL}/attend?payload=${encrypted}`;
 
     const qrDataUrl = await QRCode.toDataURL(fullURL, {
       errorCorrectionLevel: 'H',
