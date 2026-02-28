@@ -54,7 +54,7 @@ const markAttendance = async (req, res) => {
     const currentWindow = Math.floor(
       (now - session.sessionStartTime) / QR_WINDOW_MS
     );
-    if (currentWindow !== qrWindow) {
+    if (currentWindow - qrWindow > 2) {
       return res
       .status(410)
       .json({ success: false, message: 'QR Expired – Scan Again' });
