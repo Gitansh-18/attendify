@@ -27,14 +27,10 @@ const markAttendance = async (req, res) => {
         .json({ success: false, message: 'Invalid QR code.' });
     }
 
-    const { classId, sessionId, window: qrWindow, exp } = payload;
+    const { classId, sessionId, window: qrWindow } = payload;
 
     // --- Check overall session expiry ---
-    if (Date.now() > exp) {
-      return res
-        .status(410)
-        .json({ success: false, message: 'QR Expired – Scan Again' });
-    }
+    
 
     // --- Find and validate session ---
     const session = await Session.findById(sessionId);
