@@ -54,13 +54,14 @@ const markAttendance = async (req, res) => {
     }
 
     // --- Validate 4-second QR window ---
+    // --- Validate 4-second QR window ---
     const currentWindow = Math.floor(
       (now - session.sessionStartTime) / QR_WINDOW_MS
     );
     if (currentWindow !== qrWindow) {
       return res
-        .status(410)
-        .json({ success: false, message: 'QR Expired – Scan Again' });
+      .status(410)
+      .json({ success: false, message: 'QR Expired – Scan Again' });
     }
 
     // --- Duplicate check: one attendance per roll per session ---
