@@ -3,7 +3,6 @@ const express = require('express');
 const cors = require('cors');
 const connectDB = require('./utils/db');
 
-// Import routes
 const authRoutes = require('./routes/auth.routes');
 const classRoutes = require('./routes/class.routes');
 const sessionRoutes = require('./routes/session.routes');
@@ -12,40 +11,35 @@ const { protect } = require('./middleware/auth.middleware');
 
 const app = express();
 
-// Middleware
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:5174', 
-  'https://attendxin.vercel.app'
-];
+/* ================= CORS ================= */
 
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true); // allow server-to-server
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    return callback(new Error('Not allowed by CORS'));
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+const corsOptions = {
+  origin: [
+    "http://localhost:5173",
+    "https://attendifyqrfrontend.vercel.app",
+    "https://attendx-fc2jat25f-maskigitansh633-8327s-projects.vercel.app"
+  ],
+  credentials: true
+};
 
-// ✅ Explicitly handle preflight
-app.options('*', cors());
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
+
+/* ================= BODY PARSER ================= */
+
 app.use(express.json());
 
-// Connect to MongoDB
+/* ================= DATABASE ================= */
+
 connectDB();
 
-// Routes
+/* ================= ROUTES ================= */
+
 app.use('/api/auth', authRoutes);
 app.use('/api/classes', classRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/attendance', attendanceRoutes);
 
-// Protected test route (Phase 1)
 app.get('/api/test', protect, (req, res) => {
   res.json({
     success: true,
@@ -54,7 +48,8 @@ app.get('/api/test', protect, (req, res) => {
   });
 });
 
-// Global error handler
+/* ================= ERROR HANDLER ================= */
+
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ success: false, message: 'Internal Server Error' });
