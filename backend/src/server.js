@@ -13,13 +13,21 @@ const app = express();
 
 /* ================= CORS ================= */
 
+// allow the frontend(s) defined in env and localhost for dev
 const corsOptions = {
-  origin: [
-    "http://localhost:5173",
-    "https://attendifyqrfrontend.vercel.app",
-    "https://attendx-fc2jat25f-maskigitansh633-8327s-projects.vercel.app"
-  ],
-  credentials: true
+  origin: function (origin, callback) {
+    const allowedOrigins = [
+      "http://localhost:5173",
+      process.env.FRONTEND_URL,
+    ];
+
+    // when origin is undefined (e.g. server-to-server or Postman) allow it
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
 };
 
 app.use(cors(corsOptions));
