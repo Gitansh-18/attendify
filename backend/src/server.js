@@ -15,7 +15,8 @@ const app = express();
 // Middleware
 const allowedOrigins = [
   'http://localhost:5173',
-  'https://attendifyqrfrontend.vercel.app'
+  'http://localhost:5174', 
+  'https://attendxin.vercel.app'
 ];
 
 app.use(cors({
