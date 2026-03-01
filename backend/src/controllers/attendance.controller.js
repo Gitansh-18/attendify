@@ -3,13 +3,12 @@ const Attendance = require('../models/attendance.model');
 const Session = require('../models/session.model');
 const { decrypt } = require('../utils/qrCrypto');
 
-const QR_WINDOW_MS = 4 * 1000;
-
 // POST /api/attendance/mark
 const markAttendance = async (req, res) => {
   try {
     const { encryptedPayload, rollNo, name, department } = req.body;
 
+    // --- Basic validation ---
     if (!encryptedPayload || !rollNo || !name || !department) {
       return res.status(400).json({
         success: false,
@@ -22,49 +21,66 @@ const markAttendance = async (req, res) => {
     try {
       payload = JSON.parse(decrypt(encryptedPayload));
     } catch {
-      return res
-        .status(400)
-        .json({ success: false, message: 'Invalid QR code.' });
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid QR code.',
+      });
     }
 
-    const { classId, sessionId, window: qrWindow } = payload;
+    const { classId, sessionId, exp } = payload;
 
-    // --- Check overall session expiry ---
-    
+    if (!classId || !sessionId || !exp) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid QR payload structure.',
+      });
+    }
 
-    // --- Find and validate session ---
+    // --- Find session from DB ---
     const session = await Session.findById(sessionId);
+
     if (!session || !session.isActive) {
-      return res
-        .status(410)
-        .json({ success: false, message: 'QR Expired – Scan Again' });
+      return res.status(410).json({
+        success: false,
+        message: 'QR Expired – Scan Again',
+      });
     }
 
     const now = new Date();
+
+    // --- 1️⃣ Server-side session expiry check (PRIMARY SECURITY) ---
     if (now > session.sessionEndTime) {
       session.isActive = false;
       await session.save();
-      return res
-        .status(410)
-        .json({ success: false, message: 'QR Expired – Scan Again' });
+
+      return res.status(410).json({
+        success: false,
+        message: 'QR Expired – Scan Again',
+      });
     }
 
-    // --- Validate 4-second QR window ---
-    // --- Validate 4-second QR window ---
-    const currentWindow = Math.floor(
-      (now - session.sessionStartTime) / QR_WINDOW_MS
-    );
-    if (currentWindow - qrWindow > 2) {
-      return res
-      .status(410)
-      .json({ success: false, message: 'QR Expired – Scan Again' });
+    // --- 2️⃣ Cross-verify payload expiry with DB expiry ---
+    if (exp !== session.sessionEndTime.getTime()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid QR payload.',
+      });
     }
 
-    // --- Duplicate check: one attendance per roll per session ---
+    // --- 3️⃣ Ensure QR belongs to correct class ---
+    if (session.classId.toString() !== classId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid session data.',
+      });
+    }
+
+    // --- Duplicate prevention (one rollNo per session) ---
     const existing = await Attendance.findOne({
       sessionId,
       rollNo: rollNo.trim(),
     });
+
     if (existing) {
       return res.status(409).json({
         success: false,
@@ -82,17 +98,22 @@ const markAttendance = async (req, res) => {
       timestamp: now,
     });
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: 'Attendance marked successfully!',
       data: attendance,
     });
+
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 
-// GET /api/sessions/:id/attendance  – Phase 5
+
+// GET /api/sessions/:id/attendance
 const getSessionAttendance = async (req, res) => {
   try {
     const session = await Session.findOne({
@@ -101,28 +122,34 @@ const getSessionAttendance = async (req, res) => {
     });
 
     if (!session) {
-      return res
-        .status(404)
-        .json({ success: false, message: 'Session not found or unauthorized.' });
+      return res.status(404).json({
+        success: false,
+        message: 'Session not found or unauthorized.',
+      });
     }
 
-    const records = await Attendance.find({ sessionId: req.params.id }).sort({
-      timestamp: 1,
-    });
+    const records = await Attendance.find({
+      sessionId: req.params.id,
+    }).sort({ timestamp: 1 });
 
-    res.json({
+    return res.json({
       success: true,
       totalPresent: records.length,
       sessionActive: session.isActive,
       sessionEndTime: session.sessionEndTime,
       data: records,
     });
+
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 
-// GET /api/sessions/:id/attendance/export  – Phase 5 Excel export
+
+// GET /api/sessions/:id/attendance/export
 const exportAttendanceExcel = async (req, res) => {
   try {
     const session = await Session.findOne({
@@ -131,14 +158,15 @@ const exportAttendanceExcel = async (req, res) => {
     }).populate('classId', 'name subject');
 
     if (!session) {
-      return res
-        .status(404)
-        .json({ success: false, message: 'Session not found or unauthorized.' });
+      return res.status(404).json({
+        success: false,
+        message: 'Session not found or unauthorized.',
+      });
     }
 
-    const records = await Attendance.find({ sessionId: req.params.id }).sort({
-      rollNo: 1,
-    });
+    const records = await Attendance.find({
+      sessionId: req.params.id,
+    }).sort({ rollNo: 1 });
 
     const worksheetData = [
       ['Roll No', 'Name', 'Department', 'Marked At'],
@@ -153,13 +181,20 @@ const exportAttendanceExcel = async (req, res) => {
     const ws = xlsx.utils.aoa_to_sheet(worksheetData);
     const wb = xlsx.utils.book_new();
 
-    // Style header row (bold-ish via col widths)
-    ws['!cols'] = [{ wch: 15 }, { wch: 25 }, { wch: 20 }, { wch: 25 }];
+    ws['!cols'] = [
+      { wch: 15 },
+      { wch: 25 },
+      { wch: 20 },
+      { wch: 25 },
+    ];
 
     const sheetName = `${session.classId?.name || 'Class'} Attendance`;
     xlsx.utils.book_append_sheet(wb, ws, sheetName.slice(0, 31));
 
-    const buffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const buffer = xlsx.write(wb, {
+      type: 'buffer',
+      bookType: 'xlsx',
+    });
 
     res.setHeader(
       'Content-Disposition',
@@ -169,10 +204,19 @@ const exportAttendanceExcel = async (req, res) => {
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     );
-    res.send(buffer);
+
+    return res.send(buffer);
+
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 
-module.exports = { markAttendance, getSessionAttendance, exportAttendanceExcel };
+module.exports = {
+  markAttendance,
+  getSessionAttendance,
+  exportAttendanceExcel,
+};
