@@ -16,12 +16,17 @@ const app = express();
 // allow the frontend(s) defined in env and localhost for dev
 const corsOptions = {
   origin: function (origin, callback) {
+    // In development (no FRONTEND_URL), allow all origins
+    if (!process.env.FRONTEND_URL) {
+      return callback(null, true);
+    }
+
     const allowedOrigins = [
       "http://localhost:5173",
       process.env.FRONTEND_URL,
     ];
 
-    // when origin is undefined (e.g. server-to-server or Postman) allow it
+    // In production, enforce strict origin check
     if (!origin || allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
