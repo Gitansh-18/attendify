@@ -13,15 +13,7 @@ const app = express();
 
 /* ================= CORS ================= */
 
-// CORS configuration
-const corsOptions = {
-  // Temporarily allow all origins during development/testing
-  // TODO: Switch back to strict mode before production by setting FRONTEND_URL env var
-  origin: true,
-  credentials: true,
-};
-
-/* STRICT MODE (use this for production):
+// CORS configuration - strict mode for production
 const corsOptions = {
   origin: function (origin, callback) {
     const allowedOrigins = [
@@ -34,6 +26,12 @@ const corsOptions = {
     }
     callback(new Error("Not allowed by CORS"));
   },
+  credentials: true,
+};
+
+/* PERMISSIVE MODE (development only - removed):
+const corsOptions = {
+  origin: true,
   credentials: true,
 };
 */
