@@ -13,20 +13,22 @@ const app = express();
 
 /* ================= CORS ================= */
 
-// allow the frontend(s) defined in env and localhost for dev
+// CORS configuration
+const corsOptions = {
+  // Temporarily allow all origins during development/testing
+  // TODO: Switch back to strict mode before production by setting FRONTEND_URL env var
+  origin: true,
+  credentials: true,
+};
+
+/* STRICT MODE (use this for production):
 const corsOptions = {
   origin: function (origin, callback) {
-    // In development (no FRONTEND_URL), allow all origins
-    if (!process.env.FRONTEND_URL) {
-      return callback(null, true);
-    }
-
     const allowedOrigins = [
       "http://localhost:5173",
       process.env.FRONTEND_URL,
     ];
 
-    // In production, enforce strict origin check
     if (!origin || allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
@@ -34,6 +36,7 @@ const corsOptions = {
   },
   credentials: true,
 };
+*/
 
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
